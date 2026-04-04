@@ -1,0 +1,20 @@
+# Binaries
+pdf-chunker
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+
+# Go workspace file
+go.work
+
+# Ignore input/output and huge files
+input/
+output/
+*.pdf
+*.md~
+.DS_Store
