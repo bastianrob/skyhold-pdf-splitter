@@ -9,7 +9,7 @@ import (
 
 	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
-	"github.com/bastianrob/skyhold-pdf-splitter/internal/processor"
+	"github.com/bastianrob/skyhold-pdf-splitter/processor"
 )
 
 var (

@@ -1,26 +1,32 @@
 # Skyhold PDF Splitter
 
-Skyhold PDF Splitter is a high-performance Go CLI and reusable library designed to chunk and extract pages from massive, multi-gigabyte PDF files securely and without memory exhaustion (OOM).
+**Skyhold PDF Splitter** is a Go-based CLI and library used to split large PDF files into smaller chunks. It’s designed to handle multi-gigabyte files efficiently without crashing or using up all your system RAM.
 
-Through its decoupled Go API, it provides first-class support for reading input and writing output directly from/to S3-compatible object storage (or any stream providing standard `io` interfaces), ensuring seamless integration into cloud-native pipelines.
+It is built on top of [pdfcpu](https://github.com/pdfcpu/pdfcpu) and is optimized for cloud-native pipelines, allowing you to read and write directly to S3-compatible storage or any standard Go `io` stream.
 
-Under the hood, it uses the excellent [pdfcpu](https://github.com/pdfcpu/pdfcpu) engine, bypassing standard optimization logic to safely process files that would normally crash standard tools.
-
-## Features
-- **OOM-Safe Architecture**: Uses a single PDF index "map" and streams pages instead of loading gigabytes of data into RAM.
-- **Robust IO**: Atomic file writes utilizing OS-level `O_EXCL` flags prevent accidental overwrites and race conditions.
-- **Decrypted Workflows**: First-class support for password-protected PDFs via CLI flag or standard environment variables (useful for CI/CD pipelines).
-- **Reusable API**: Designed with decoupled `io.ReadSeeker` and `io.Writer` interfaces, making it trivial to embed into backend web servers, AWS S3 pipelines, etc.
+## Key Capabilities
+- **Memory Efficient**: Instead of loading the whole file into RAM, it indexes the PDF and streams individual pages.
+- **S3 & Stream Ready**: Uses `io.ReadSeeker` and `io.Writer` interfaces, so you can plug it into AWS S3, MinIO, or web servers easily.
+- **Password Support**: Handles encrypted PDFs via CLI flags or the `PDF_PASSWORD` environment variable.
+- **Safe Overwrites**: Uses standard OS flags to prevent accidental file corruption or race conditions.
 
 ## Installation
 
-Since the module is fully self-contained, you can install the CLI directly via standard Go tooling:
+### For CLI usage:
+Install the `pdf-chunker` binary directly into your `$GOPATH/bin`:
 
 ```bash
 go install github.com/bastianrob/skyhold-pdf-splitter/cmd/pdf-chunker@latest
 ```
 
-*(Ensure your `$(go env GOPATH)/bin` directory is in your system `$PATH`)*
+### For Library usage:
+Add the `processor` package as a dependency to your Go project:
+
+```bash
+go get github.com/bastianrob/skyhold-pdf-splitter
+```
+
+*(Ensure your `$(go env GOPATH)/bin` directory is in your system `$PATH` for the CLI)*
 
 ## CLI Usage
 
@@ -40,11 +46,12 @@ pdf-chunker extract -i ./massive_report.pdf -f 10 -t 50 -o ./snippet.pdf -v
 *(If you pass a directory to `-o` instead of a file name, the output will automatically be named `<base>-p10-p50.pdf`)*
 
 ### Global Flags
-- `--input` / `-i`: Path to the source file (Required)
-- `--out` / `-o`: Path to the target directory or explicit file (Required)
-- `--password` / `-p`: PDF decryption key (Optional. Will fallback to the `PDF_PASSWORD` env var).
-- `--force` / `-f`: Overwrite existing target files (Optional)
-- `--verbose` / `-v`: Enables the CLI Progress Bar (`█░░░`) and detailed activity logs (Optional)
+- `-i, --input`: Source PDF file (Required)
+- `-o, --out`: Destination directory or file (Required)
+- `-s, --size`: Number of pages per chunk (Required for splitting)
+- `-p, --password`: Password for encrypted files (Optional, or use `PDF_PASSWORD` env var)
+- `-f, --force`: Overwrite existing target files (Optional)
+- `-v, --verbose`: Enables the CLI Progress Bar (`█░░░`) and detailed activity logs (Optional)
 
 ## Library Usage (Go Package)
 
@@ -58,7 +65,7 @@ package main
 import (
     "os"
     "log"
-    "github.com/bastianrob/skyhold-pdf-splitter/internal/processor"
+    "github.com/bastianrob/skyhold-pdf-splitter/processor"
 )
 
 func main() {
@@ -119,7 +126,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/bastianrob/skyhold-pdf-splitter/internal/processor"
+	"github.com/bastianrob/skyhold-pdf-splitter/processor"
 	"gocloud.dev/blob"
 	_ "gocloud.dev/blob/s3blob"
 )
