@@ -2,6 +2,8 @@
 
 Skyhold PDF Splitter is a high-performance Go CLI and reusable library designed to chunk and extract pages from massive, multi-gigabyte PDF files securely and without memory exhaustion (OOM).
 
+Through its decoupled Go API, it provides first-class support for reading input and writing output directly from/to S3-compatible object storage (or any stream providing standard `io` interfaces), ensuring seamless integration into cloud-native pipelines.
+
 Under the hood, it uses the excellent [pdfcpu](https://github.com/pdfcpu/pdfcpu) engine, bypassing standard optimization logic to safely process files that would normally crash standard tools.
 
 ## Features
@@ -101,4 +103,64 @@ config := processor.ChunkConfig{
 }
 
 processor.Chunk(config)
+```
+
+### Example: Processing to/from S3 (via gocloud.dev)
+
+Since PDF parsing requires an `io.ReadSeeker` (random access) to read the internal document index, remote S3 streams cannot be parsed on-the-fly. The standard approach is to download the source blob to a local temporary file first, but **stream the extracted chunks directly back to S3**.
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"log"
+	"os"
+
+	"github.com/bastianrob/skyhold-pdf-splitter/internal/processor"
+	"gocloud.dev/blob"
+	_ "gocloud.dev/blob/s3blob"
+)
+
+func main() {
+	ctx := context.Background()
+
+	// 1. Connect to S3 compatible storage
+	bucket, err := blob.OpenBucket(ctx, "s3://my-bucket?region=us-east-1")
+	if err != nil {
+		log.Fatalf("Failed to open bucket: %v", err)
+	}
+	defer bucket.Close()
+
+	// 2. Download source PDF to a local temp file for io.ReadSeeker support
+	s3Reader, _ := bucket.NewReader(ctx, "massive_report.pdf", nil)
+	tempFile, _ := os.CreateTemp("", "source-*.pdf")
+	io.Copy(tempFile, s3Reader)
+	s3Reader.Close()
+	
+	// Reset pointer to the beginning of the file to prepare for parsing
+	tempFile.Seek(0, io.SeekStart)
+	defer os.Remove(tempFile.Name()) // Clean up locally
+	defer tempFile.Close()
+
+	// 3. Chunk PDF and stream outputs back to S3 directly
+	config := processor.ChunkConfig{
+		Input:    tempFile,
+		PageSize: 100,
+		CreateWriter: func(chunkIndex int, maxDigits int) (io.WriteCloser, error) {
+			// Stream the output chunk directly to S3
+			outKey := fmt.Sprintf("output/chunk-%0*d.pdf", maxDigits, chunkIndex)
+			return bucket.NewWriter(ctx, outKey, nil)
+		},
+		OnLog: func(msg string) {
+			log.Println(msg)
+		},
+	}
+
+	if err := processor.Chunk(config); err != nil {
+		log.Fatalf("Chunking failed: %v", err)
+	}
+}
 ```
