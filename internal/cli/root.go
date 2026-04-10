@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/schollz/progressbar/v3"
@@ -19,6 +20,10 @@ var (
 	password  string
 	force     bool
 	verbose   bool
+	compress    bool
+	quality     int
+	concurrency int
+	scale       int
 )
 
 var rootCmd = &cobra.Command{
@@ -27,8 +32,8 @@ var rootCmd = &cobra.Command{
 	Long:  `A command-line interface designed to split large PDF files into smaller chunks or extract specific page ranges.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Default behavior: Split into chunks
-		if inputPath == "" || size <= 0 || outDir == "" {
-			return fmt.Errorf("invalid arguments: --input, --size (must be > 0), and --out are required for splitting. Use 'extract' subcommand for extraction")
+		if inputPath == "" || outDir == "" {
+			return fmt.Errorf("invalid arguments: --input and --out are required")
 		}
 
 		if password == "" {
@@ -42,13 +47,7 @@ var rootCmd = &cobra.Command{
 		}
 		defer inputFile.Close()
 
-		// 2. Prepare directories
-		if err := os.MkdirAll(outDir, 0755); err != nil {
-			return fmt.Errorf("failed to create output directory: %w", err)
-		}
-		baseName := strings.TrimSuffix(filepath.Base(inputPath), filepath.Ext(inputPath))
-
-		// 3. Setup UI (Progress & Logs)
+		// 2. Setup UI (Progress & Logs)
 		var bar *progressbar.ProgressBar
 		var logFn func(string)
 		var progressFn func(int, int)
@@ -60,28 +59,71 @@ var rootCmd = &cobra.Command{
 			progressFn = func(current, total int) {
 				if bar == nil {
 					bar = progressbar.NewOptions(total,
-						progressbar.OptionSetDescription("[green]Chunking[reset]"),
+						progressbar.OptionSetDescription("[green]Processing[reset]"),
 						progressbar.OptionSetWriter(os.Stderr),
 						progressbar.OptionShowCount(),
 						progressbar.OptionSetWidth(40),
 						progressbar.OptionEnableColorCodes(true),
 						progressbar.OptionSetPredictTime(true),
 						progressbar.OptionSetElapsedTime(true),
-						progressbar.OptionSetTheme(progressbar.Theme{
-							Saucer:        "[green]█[reset]",
-							SaucerHead:    "[green]█[reset]",
-							SaucerPadding: "░",
-							BarStart:      "|",
-							BarEnd:        "|",
-						}),
 					)
 				}
-				bar.Add(1)
+				bar.Set(current)
 				if current == total {
 					fmt.Println()
 				}
 			}
 		}
+
+		// If size is missing but compress is enabled, treat it as a standalone compression operation
+		if size <= 0 && compress {
+			createWriter := func() (io.WriteCloser, error) {
+				flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+				if !force {
+					flags = os.O_WRONLY | os.O_CREATE | os.O_EXCL
+				}
+				outFile, err := os.OpenFile(outDir, flags, 0644)
+				if err != nil {
+					if os.IsExist(err) {
+						return nil, fmt.Errorf("file already exists: %s (use --force to overwrite)", outDir)
+					}
+					return nil, fmt.Errorf("failed to create file %s: %w", outDir, err)
+				}
+				return outFile, nil
+			}
+
+			config := processor.CompressConfig{
+				Input:        inputFile,
+				Password:     password,
+				Quality:      quality,
+				Concurrency:  concurrency,
+				Scale:        scale,
+				CreateWriter: createWriter,
+				OnLog:        logFn,
+				OnProgress:   progressFn,
+			}
+
+			err = processor.CompressPDF(config)
+			if err == nil {
+				if verbose {
+					fmt.Printf("Successfully compressed PDF into %s\n", outDir)
+				} else {
+					fmt.Printf("Compression successful.\n")
+				}
+			}
+			return err
+		}
+
+		// Otherwise, proceed with chunking logic (requires size)
+		if size <= 0 {
+			return fmt.Errorf("invalid arguments: --size (must be > 0) is required for splitting. Use 'compress' subcommand or add --compress for standalone optimization")
+		}
+
+		// 3. Prepare directories
+		if err := os.MkdirAll(outDir, 0755); err != nil {
+			return fmt.Errorf("failed to create output directory: %w", err)
+		}
+		baseName := strings.TrimSuffix(filepath.Base(inputPath), filepath.Ext(inputPath))
 
 		// 4. Setup Factory
 		createWriter := func(chunkIndex int, maxDigits int) (io.WriteCloser, error) {
@@ -108,6 +150,10 @@ var rootCmd = &cobra.Command{
 			Input:        inputFile,
 			PageSize:     size,
 			Password:     password,
+			Compress:     compress,
+			Quality:      quality,
+			Concurrency:  concurrency,
+			Scale:        scale,
 			CreateWriter: createWriter,
 			OnLog:        logFn,
 			OnProgress:   progressFn,
@@ -136,6 +182,10 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&password, "password", "p", "", "Password for encrypted PDFs (Optional)")
 	rootCmd.PersistentFlags().BoolVarP(&force, "force", "f", false, "Overwrite existing files")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enables detailed logging and progress bar")
+	rootCmd.PersistentFlags().BoolVarP(&compress, "compress", "c", false, "Enable combined structural optimization and image compression")
+	rootCmd.PersistentFlags().IntVarP(&quality, "quality", "q", 60, "JPEG compression quality from 1 to 100 (Default: 60)")
+	rootCmd.PersistentFlags().IntVarP(&concurrency, "concurrency", "j", runtime.NumCPU(), "Number of parallel workers for image compression (Default: NumCPU)")
+	rootCmd.PersistentFlags().IntVarP(&scale, "scale", "m", 100, "Image scaling factor in percentage (1-100, Default: 100)")
 
 	// Local flags (only for the root command = split)
 	rootCmd.Flags().IntVarP(&size, "size", "s", 0, "The number of pages per chunk (Required for split)")

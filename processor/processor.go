@@ -16,9 +16,27 @@ type ChunkConfig struct {
 	Input    io.ReadSeeker
 	PageSize int
 	Password string
+	Compress bool
+	Quality     int
+	Concurrency int
+	Scale       int
 
 	// Callbacks
 	CreateWriter func(chunkIndex int, maxDigits int) (io.WriteCloser, error)
+	OnProgress   func(current, total int)
+	OnLog        func(msg string)
+}
+
+// CompressConfig holds the configuration for standalone compression
+type CompressConfig struct {
+	Input    io.ReadSeeker
+	Password string
+	Quality     int
+	Concurrency int
+	Scale       int
+
+	// Callbacks
+	CreateWriter func() (io.WriteCloser, error)
 	OnProgress   func(current, total int)
 	OnLog        func(msg string)
 }
@@ -28,7 +46,9 @@ type ExtractConfig struct {
 	Input    io.ReadSeeker
 	From     int
 	To       int
-	Password string
+	Password    string
+	Concurrency int
+	Scale       int
 
 	// Callbacks
 	Output     io.Writer
@@ -37,11 +57,11 @@ type ExtractConfig struct {
 }
 
 // prepareContext opens the PDF and returns a validated context
-func prepareContext(input io.ReadSeeker, password string, log func(string)) (*model.Context, error) {
+func prepareContext(input io.ReadSeeker, password string, compress bool, log func(string)) (*model.Context, error) {
 	conf := model.NewDefaultConfiguration()
 	conf.UserPW = password
 	conf.OwnerPW = password
-	conf.Optimize = false // Disable optimization for memory safety
+	conf.Optimize = compress // Enable structural optimization if compression is requested
 
 	if log != nil {
 		log("Initializing PDF context (reading indexing)...")
@@ -61,7 +81,7 @@ func prepareContext(input io.ReadSeeker, password string, log func(string)) (*mo
 
 // Chunk executes the PDF splitting process
 func Chunk(c ChunkConfig) error {
-	ctx, err := prepareContext(c.Input, c.Password, c.OnLog)
+	ctx, err := prepareContext(c.Input, c.Password, c.Compress, c.OnLog)
 	if err != nil {
 		return err
 	}
@@ -98,6 +118,16 @@ func Chunk(c ChunkConfig) error {
 			continue
 		}
 
+		if c.Compress {
+			if err := compressContextImages(ctxDest, c.Quality, c.Concurrency, c.Scale, nil); err != nil && c.OnLog != nil {
+				c.OnLog(fmt.Sprintf("warning: image compression failed on chunk %d: %v", i, err))
+			}
+			// Important: Ensure the context actually triggers structural optimization natively if desired
+			if ctxDest.Configuration != nil {
+				ctxDest.Configuration.Optimize = true
+			}
+		}
+
 		writer, err := c.CreateWriter(i, maxDigits)
 		if err != nil {
 			errorMsgs = append(errorMsgs, fmt.Sprintf("failed to create writer for chunk %d: %v", i, err))
@@ -123,9 +153,52 @@ func Chunk(c ChunkConfig) error {
 	return nil
 }
 
+// CompressPDF executes the standalone PDF compression process without splitting
+func CompressPDF(c CompressConfig) error {
+	ctx, err := prepareContext(c.Input, c.Password, true, c.OnLog)
+	if err != nil {
+		return err
+	}
+
+	if c.OnLog != nil {
+		c.OnLog("Compressing image streams (parallel)...")
+	}
+
+	// 1. Process image objects with granular progress and concurrency
+	if err := compressContextImages(ctx, c.Quality, c.Concurrency, c.Scale, c.OnProgress); err != nil && c.OnLog != nil {
+		c.OnLog(fmt.Sprintf("warning: encountered issue compressing images: %v", err))
+	}
+
+	// 2. Pre-optimization pass explicitly trigger pdfcpu cleanup if Optimize is true
+	if err := api.OptimizeContext(ctx); err != nil && c.OnLog != nil {
+		c.OnLog(fmt.Sprintf("warning: structural optimization had issues: %v", err))
+	}
+
+	// 3. Write
+	writer, err := c.CreateWriter()
+	if err != nil {
+		return fmt.Errorf("failed to create writer: %w", err)
+	}
+	defer writer.Close()
+
+	if err := api.WriteContext(ctx, writer); err != nil {
+		return fmt.Errorf("failed to write compressed PDF: %w", err)
+	}
+
+	if c.OnProgress != nil {
+		c.OnProgress(1, 1)
+	}
+
+	if c.OnLog != nil {
+		c.OnLog("Compression successful.")
+	}
+
+	return nil
+}
+
 // Extract executes the PDF extraction process (Range Mode)
 func Extract(c ExtractConfig) error {
-	ctx, err := prepareContext(c.Input, c.Password, c.OnLog)
+	ctx, err := prepareContext(c.Input, c.Password, false, c.OnLog)
 	if err != nil {
 		return err
 	}

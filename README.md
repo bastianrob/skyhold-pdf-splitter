@@ -6,6 +6,7 @@ It is built on top of [pdfcpu](https://github.com/pdfcpu/pdfcpu) and is optimize
 
 ## Key Capabilities
 - **Memory Efficient**: Instead of loading the whole file into RAM, it indexes the PDF and streams individual pages.
+- **Pure-Go Image Compression**: Supports aggressive JPEG re-sampling and structural optimization for scanned documents without requiring Ghostscript or CGO.
 - **S3 & Stream Ready**: Uses `io.ReadSeeker` and `io.Writer` interfaces, so you can plug it into AWS S3, MinIO, or web servers easily.
 - **Password Support**: Handles encrypted PDFs via CLI flags or the `PDF_PASSWORD` environment variable.
 - **Safe Overwrites**: Uses standard OS flags to prevent accidental file corruption or race conditions.
@@ -31,10 +32,19 @@ go get github.com/bastianrob/skyhold-pdf-splitter
 ## CLI Usage
 
 ### Chunking (Splitting) a PDF
-Split an entire document into chunks of a designated size.
+Split an entire document into chunks of a designated size. You can optionally compress the output chunks to save space.
 
 ```bash
-pdf-chunker -i ./massive_report.pdf -s 100 -o ./output_dir/ -v
+pdf-chunker -i ./massive_report.pdf -s 100 -o ./output_dir/ -v -c -q 50
+```
+
+### Standalone PDF Compression
+Shrink a PDF without splitting it into chunks. This is ideal for reducing the size of image-heavy scans.
+
+```bash
+pdf-chunker compress -i ./large_scan.pdf -o ./compressed.pdf -q 60
+# OR you can use the shorthand
+pdf-chunker -i ./large_scan.pdf -c -o ./compressed.pdf -q 60
 ```
 
 ### Extracting a Specific Page Range
@@ -50,6 +60,8 @@ pdf-chunker extract -i ./massive_report.pdf -f 10 -t 50 -o ./snippet.pdf -v
 - `-o, --out`: Destination directory or file (Required)
 - `-s, --size`: Number of pages per chunk (Required for splitting)
 - `-p, --password`: Password for encrypted files (Optional, or use `PDF_PASSWORD` env var)
+- `-c, --compress`: Enables structural optimization and image re-sampling (JPEG quality reduction)
+- `-q, --quality`: Sets the JPEG compression quality (1-100, default: 60)
 - `-f, --force`: Overwrite existing target files (Optional)
 - `-v, --verbose`: Enables the CLI Progress Bar (`█░░░`) and detailed activity logs (Optional)
 
@@ -110,6 +122,22 @@ config := processor.ChunkConfig{
 }
 
 processor.Chunk(config)
+```
+
+### Example: Standalone Compression
+
+```go
+config := processor.CompressConfig{
+    Input:    file,
+    Quality:  45, // Set aggressive JPEG compression
+    CreateWriter: func() (io.WriteCloser, error) {
+        return os.Create("optimized.pdf")
+    },
+}
+
+if err := processor.CompressPDF(config); err != nil {
+    log.Fatal(err)
+}
 ```
 
 ### Example: Processing to/from S3 (via gocloud.dev)
