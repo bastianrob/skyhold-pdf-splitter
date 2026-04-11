@@ -10,7 +10,7 @@ import (
 
 	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
-	"github.com/bastianrob/skyhold-pdf-splitter/processor"
+	"github.com/bastianrob/skyhold-pdf/processor"
 )
 
 var (
@@ -27,9 +27,9 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "pdf-chunker",
-	Short: "A high-performance PDF chunker CLI",
-	Long:  `A command-line interface designed to split large PDF files into smaller chunks or extract specific page ranges.`,
+	Use:   "pdf",
+	Short: "A high-performance PDF CLI tool",
+	Long:  `A command-line interface designed to split, compress, extract and combine PDF files efficiently.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Default behavior: Split into chunks
 		if inputPath == "" || outDir == "" {
@@ -189,7 +189,4 @@ func init() {
 
 	// Local flags (only for the root command = split)
 	rootCmd.Flags().IntVarP(&size, "size", "s", 0, "The number of pages per chunk (Required for split)")
-
-	rootCmd.MarkPersistentFlagRequired("input")
-	rootCmd.MarkPersistentFlagRequired("out")
 }
