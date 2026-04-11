@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/bastianrob/skyhold-pdf-splitter/processor"
+	"github.com/bastianrob/skyhold-pdf/processor"
 	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
 )

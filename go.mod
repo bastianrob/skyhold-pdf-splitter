@@ -1,4 +1,4 @@
-module github.com/bastianrob/skyhold-pdf-splitter
+module github.com/bastianrob/skyhold-pdf
 
 go 1.26.0
 
@@ -6,6 +6,7 @@ require (
 	github.com/pdfcpu/pdfcpu v0.11.1
 	github.com/schollz/progressbar/v3 v3.19.0
 	github.com/spf13/cobra v1.10.2
+	golang.org/x/image v0.32.0
 )
 
 require (
@@ -20,7 +21,6 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	golang.org/x/crypto v0.43.0 // indirect
-	golang.org/x/image v0.32.0 // indirect
 	golang.org/x/sys v0.37.0 // indirect
 	golang.org/x/term v0.36.0 // indirect
 	golang.org/x/text v0.30.0 // indirect

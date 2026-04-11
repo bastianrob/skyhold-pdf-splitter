@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/bastianrob/skyhold-pdf-splitter/processor"
+	"github.com/bastianrob/skyhold-pdf/processor"
 )
 
 var (
