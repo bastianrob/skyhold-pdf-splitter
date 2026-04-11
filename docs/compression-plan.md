@@ -43,7 +43,7 @@ The solution must be built entirely with pure Go, using only OSS dependencies to
 ## Verification Plan
 
 ### Automated/Manual Verification
-1.  **Build Binary:** Run `go build -o pdf-chunker ./cmd/pdf-chunker`. Make sure it builds without CGO dependencies.
-2.  **Test Chunking With Compression:** Run `./pdf-chunker -c -i test/large-scan.pdf -s 5 -o output/` and verify the chunks are compressed properly.
-3.  **Test Standalone Compression:** Run `./pdf-chunker compress -i test/large-scan.pdf -o output/compressed-scan.pdf`.
+1.  **Build Binary:** Run `go build -o pdf ./cmd/pdf`. Make sure it builds without CGO dependencies.
+2.  **Test Chunking With Compression:** Run `./pdf -c -i test/large-scan.pdf -s 5 -o output/` and verify the chunks are compressed properly.
+3.  **Test Standalone Compression:** Run `./pdf compress -i test/large-scan.pdf -o output/compressed-scan.pdf`.
 4.  **Validate Result:** Compare the standalone compressed PDF file size against the original file, open it to ensure readability, and verify zero data corruption.

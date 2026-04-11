@@ -1,43 +1,48 @@
-# PDF Chunker CLI - Implementation Walkthrough
+# Skyhold PDF - Implementation Walkthrough
 
-The high-performance PDF Chunker CLI has been successfully implemented in Go. It meets all the requirements from the [spec.md](file:///Users/robinbastian/OSS/pdf-processor.skyhold.id/spec.md), including massive file support, safe concurrency, and password protection.
+The high-performance **Skyhold PDF** CLI and library have been successfully implemented and rebranded. The project now supports a full suite of PDF operations including splitting, merging (combining), extraction, and advanced image compression.
 
 ## Key Features Implemented
 
-### 🛡️ Safe Concurrency & Worker Pool
-The core splitting logic uses a worker pool where each worker opens its own read-only file handle (`os.Open`) to the source PDF. This prevents race conditions during `Seek` operations while allowing multi-core systems to chunk PDFs at maximum speed.
+### 🛡️ Rebranding & Identity
+The project has transitioned from `pdf-chunker` to `Skyhold PDF`. 
+- New binary name: `pdf`
+- New module path: `github.com/bastianrob/skyhold-pdf`
+- Updated documentation and internal CLI references.
 
-### 🐘 Massive File Support
-By using `os.File` and `api.PageCount`/`api.TrimFile` from `pdfcpu`, the application avoids loading the full PDF payload into memory. It only fetches necessary objects via random-access seeking, making it scalable for multi-GB files.
+### 🧩 PDF Combining (Merging)
+A new `combine` subcommand allows users to merge multiple PDFs into a single file with optional on-the-fly compression.
+- **Library Support**: `processor.CombinePDFs` is available for programmatic use.
+- **Progressive UI**: Real-time progress tracking for both merging and internal image optimization phases.
 
-### 🔑 Encryption & Security
-- Supports password-protected PDFs via the `--password` (`-p`) flag.
-- Alternatively, reads from the `PDF_PASSWORD` environment variable for security in CI/CD pipelines.
-
-### 📊 User Experience
-- **Interactive Progress Bar**: Integrated `schollz/progressbar/v3` for a smooth terminal experience during long operations.
-- **Robust Naming**: Automatically zero-pads chunk numbers (e.g., `report-01.pdf` vs `report-12.pdf`) for correct alphabetical sorting.
+### 🐘 Massive File Support & Performance
+- **Streaming Indexing**: Avoids loading full PDF payloads into RAM, making it scalable for multi-GB files.
+- **Parallel Optimization**: Uses a worker pool for aggressive image compression and structural cleanup.
 
 ## Deployment & Usage
 
 ### Building from Source
 ```bash
-go build -o pdf-chunker ./cmd/pdf-chunker/main.go
+/usr/local/go/bin/go build -o pdf ./cmd/pdf/main.go
 ```
 
 ### Example Usage
 ```bash
-./pdf-chunker --input report.pdf --size 10 --out ./chunks --verbose
+# Merge and compress multiple PDFs
+./pdf combine part1.pdf part2.pdf -o final.pdf --compress --quality 50 --verbose
+
+# Batch split a report
+./pdf -i report.pdf -s 10 -o ./chunks -v
 ```
 
 ## Verification Results
 
-- [x] **CLI Flag Parsing**: All flags (`--input`, `--size`, `--out`, `--password`, `--force`, `--verbose`) are correctly mapped.
-- [x] **Recursive Directory Creation**: `os.MkdirAll` ensures the output directory and its parents are created if they don't exist.
-- [x] **Error Handling**: Graceful failure with descriptive messages if files exist (without `--force`) or if the PDF is encrypted but no password is provided.
-- [x] **Build Verification**: The binary builds successfully with `go 1.21+`.
+- [x] **Recursive Rebrand**: All imports, documentation, and the entry point directory have been updated.
+- [x] **Library Integration**: `processor` package exposes `Chunk`, `Extract`, `CompressPDF`, and `CombinePDFs`.
+- [x] **CLI Flag Consistency**: Global flags for compression, concurrency, and verbosity are shared across all subcommands.
+- [x] **Stability**: Verified with `go mod tidy` and local build checks.
 
 ---
 
 > [!TIP]
-> Use the `--force` flag if you want to re-run the same command and overwrite previous chunks without being prompted.
+> Use the `pdf --help` command to see the full list of subcommands and global flags available.

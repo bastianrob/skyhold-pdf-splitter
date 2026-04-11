@@ -1,9 +1,20 @@
-# Changelog
-
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [1.2.0] - 2026-04-11
+
+### Added
+- New `combine` command to merge multiple PDF files into a single document.
+- Support for on-the-fly structural and image compression during the merging process.
+- Library-level support for combining PDFs via `processor.CombinePDFs` with granular progress reporting.
+
+### Changed
+- **Major Rebrand**: Renamed the project to **Skyhold PDF** and updated the CLI binary name to `pdf`.
+- Migrated Go module path to `github.com/bastianrob/skyhold-pdf`.
+- Refreshed all documentation and usage examples to reflect the new identity.
+- Improved progress tracking during complex multi-phase operations.
+
+### Fixed
+- Resolved a `nil pointer dereference` panic during `combine` operations by transitioning from low-level `MergeXRefTables` to the robust `api.MergeRaw` interface.
 
 ## [1.1.0] - 2026-04-10
 

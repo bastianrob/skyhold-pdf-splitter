@@ -1,4 +1,4 @@
-# PDF Chunker CLI Specification
+# Skyhold PDF Specification (Splitter)
 
 ## 1. Overview
 A command-line interface (CLI) application designed to take a source PDF file and split it into multiple smaller PDF files based on a user-defined chunk size.

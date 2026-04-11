@@ -1,212 +1,97 @@
-# Skyhold PDF Splitter
+# Skyhold PDF
 
-**Skyhold PDF Splitter** is a Go-based CLI and library used to split large PDF files into smaller chunks. It’s designed to handle multi-gigabyte files efficiently without crashing or using up all your system RAM.
+**Skyhold PDF** is a high-performance Go-based CLI and library designed to split, merge, compress, and extract PDF files with extreme memory efficiency. It handles multi-gigabyte files with ease by utilizing stream-based indexing rather than loading full documents into RAM.
 
-It is built on top of [pdfcpu](https://github.com/pdfcpu/pdfcpu) and is optimized for cloud-native pipelines, allowing you to read and write directly to S3-compatible storage or any standard Go `io` stream.
+Built on top of [pdfcpu](https://github.com/pdfcpu/pdfcpu), it is optimized for cloud-native pipelines, supporting direct integration with Go `io` streams (S3, MinIO, or local storage).
 
 ## Key Capabilities
-- **Memory Efficient**: Instead of loading the whole file into RAM, it indexes the PDF and streams individual pages.
-- **Pure-Go Image Compression**: Supports aggressive JPEG re-sampling and structural optimization for scanned documents without requiring Ghostscript or CGO.
-- **S3 & Stream Ready**: Uses `io.ReadSeeker` and `io.Writer` interfaces, so you can plug it into AWS S3, MinIO, or web servers easily.
-- **Password Support**: Handles encrypted PDFs via CLI flags or the `PDF_PASSWORD` environment variable.
-- **Safe Overwrites**: Uses standard OS flags to prevent accidental file corruption or race conditions.
+- **Memory Efficient**: Streams individual pages via indexing, perfect for massive PDFs.
+- **Advanced Re-sampling**: Pure-Go image compression with worker-pool parallelization for aggressive size reduction.
+- **Combined Merge & Compress**: Merge multiple PDFs and optimize the resulting file in a single processing pass.
+- **Cloud Ready**: Plugs directly into any `io.ReadSeeker` or `io.Writer`.
+- **Zero Dependencies**: Compiles to a single static binary without requiring Ghostscript or CGO.
 
 ## Installation
 
 ### For CLI usage:
-Install the `pdf-chunker` binary directly into your `$GOPATH/bin`:
+Install the `pdf` binary directly into your `$GOPATH/bin`:
 
 ```bash
-go install github.com/bastianrob/skyhold-pdf-splitter/cmd/pdf-chunker@latest
+go install github.com/bastianrob/skyhold-pdf/cmd/pdf@latest
 ```
 
 ### For Library usage:
-Add the `processor` package as a dependency to your Go project:
+Add the `processor` package to your Go project:
 
 ```bash
-go get github.com/bastianrob/skyhold-pdf-splitter
+go get github.com/bastianrob/skyhold-pdf
 ```
 
-*(Ensure your `$(go env GOPATH)/bin` directory is in your system `$PATH` for the CLI)*
+---
 
 ## CLI Usage
 
-### Chunking (Splitting) a PDF
-Split an entire document into chunks of a designated size. You can optionally compress the output chunks and use multiple CPU cores to speed up the process.
-
+### 1. Splitting (Chunking)
+Split a massive PDF into smaller batches of a specific page size.
 ```bash
-pdf-chunker -i ./massive_report.pdf -s 100 -o ./output_dir/ -v -c -q 50 -j 8
+pdf -i report.pdf -s 50 -o ./output/ -v
 ```
 
-### Standalone PDF Compression
-Shrink a PDF without splitting it into chunks. This is ideal for reducing the size of image-heavy scans.
-
+### 2. Merging (Combining)
+Merge multiple PDF files into one. You can optionally compress the result.
 ```bash
-# Aggressive compression: 40% quality + 50% image scale on all cores
-pdf-chunker compress -i ./large_scan.pdf -o ./compressed.pdf -q 40 -m 50 -v
-
-# Shorthand for standalone compression (no --size provided)
-pdf-chunker -i ./large_scan.pdf -c -q 60 -o ./compressed.pdf
+pdf combine doc1.pdf doc2.pdf -o merged.pdf -c -q 60
 ```
 
-### Extracting a Specific Page Range
-Extract a targeted slice of a document (e.g., Pages 10 to 50) and save it directly to a file.
-
+### 3. Compression
+Optimize an existing PDF's structure and downsample images.
 ```bash
-pdf-chunker extract -i ./massive_report.pdf -f 10 -t 50 -o ./snippet.pdf -v
+# Aggressive optimization
+pdf compress -i scan.pdf -o small.pdf -q 40 -m 50 -v
 ```
-*(If you pass a directory to `-o` instead of a file name, the output will automatically be named `<base>-p10-p50.pdf`)*
 
-### Global Flags
-- `-i, --input`: Source PDF file (Required)
-- `-o, --out`: Destination directory or file (Required)
-- `-s, --size`: Number of pages per chunk (Required for splitting)
-- `-p, --password`: Password for encrypted files (Optional, or use `PDF_PASSWORD` env var)
-- `-c, --compress`: Enables structural optimization and image re-sampling
-- `-q, --quality`: Sets the JPEG compression quality (1-100, default: 60)
-- `-m, --scale`: Sets the image scaling percentage (1-100, default: 100)
-- `-j, --concurrency`: Number of parallel workers for image compression (Default: NumCPU)
-- `-f, --force`: Overwrite existing target files (Optional)
-- `-v, --verbose`: Enables the CLI Progress Bar (`█░░░`) and detailed activity logs (Optional)
+### 4. Extraction
+Extract a targeted page range.
+```bash
+pdf extract -i source.pdf -f 10 -t 20 -o snippet.pdf
+```
 
-## Library Usage (Go Package)
+## Global Flags
+- `-i, --input`: Source PDF file (Required for root, compress, extract)
+- `-o, --out`: Destination file or directory (Required)
+- `-s, --size`: Pages per chunk (Root command)
+- `-c, --compress`: Enable structural and image optimization
+- `-q, --quality`: JPEG compression quality (1-100, default: 60)
+- `-m, --scale`: Image scaling factor (1-100, default: 100)
+- `-j, --concurrency`: Parallel workers for optimization (Default: NumCPU)
+- `-p, --password`: PDF password
+- `-f, --force`: Overwrite existing files
+- `-v, --verbose`: Enable progress bars and detailed logs
 
-You can import `processor` to chunk or extract PDFs securely from memory streams, cloud storage, or anywhere else that supports standard Go `io` interfaces.
+---
 
-### Example: Extracting via `io.Reader/Writer`
+## Library Usage
 
+### Example: Merging PDFs Programmatically
 ```go
-package main
-
-import (
-    "os"
-    "log"
-    "github.com/bastianrob/skyhold-pdf-splitter/processor"
-)
+import "github.com/bastianrob/skyhold-pdf/processor"
 
 func main() {
-    file, _ := os.Open("massive.pdf")
-    defer file.Close()
-
-    outFile, _ := os.Create("extracted.pdf")
-    defer outFile.Close()
-
-    config := processor.ExtractConfig{
-        Input:    file,     // Any io.ReadSeeker
-        Output:   outFile,  // Any io.Writer
-        From:     10,
-        To:       20,
-        Password: "my_secret_password",
-        OnLog: func(msg string) {
-            log.Println(msg)
+    config := processor.CombineConfig{
+        Inputs:   []io.ReadSeeker{file1, file2},
+        Compress: true,
+        Quality:  50,
+        CreateWriter: func() (io.WriteCloser, error) {
+            return os.Create("merged.pdf")
+        },
+        OnProgress: func(curr, total int) {
+            fmt.Printf("Merging: %d/%d\n", curr, total)
         },
     }
-
-    if err := processor.Extract(config); err != nil {
-        log.Fatalf("Extraction failed: %v", err)
-    }
-}
-```
-
-### Example: Splitting / Chunking
-
-For chunking, you must provide a `CreateWriter` factory function that returns an `io.WriteCloser` for each requested chunk loop.
-
-```go
-config := processor.ChunkConfig{
-    Input:    file,
-    PageSize: 100,
-    CreateWriter: func(chunkIndex int, maxDigits int) (io.WriteCloser, error) {
-        // e.g. Return an S3 stream or a local file
-        return os.Create(fmt.Sprintf("chunk-%d.pdf", chunkIndex))
-    },
-    OnProgress: func(current, total int) {
-        fmt.Printf("Progress: %d/%d\n", current, total)
-    },
-}
-
-processor.Chunk(config)
-```
-
-### Example: Standalone Compression
-
-```go
-config := processor.CompressConfig{
-    Input:       file,
-    Quality:     40,
-    Scale:       50, // 50% resolution
-    Concurrency: 8,  // Use 8 CPU cores
-    CreateWriter: func() (io.WriteCloser, error) {
-        return os.Create("optimized.pdf")
-    },
-}
-
-if err := processor.CompressPDF(config); err != nil {
-    log.Fatal(err)
-}
-```
-
-### Example: Processing to/from S3 (via gocloud.dev)
-
-Since PDF parsing requires an `io.ReadSeeker` (random access) to read the internal document index, remote S3 streams cannot be parsed on-the-fly. The standard approach is to download the source blob to a local temporary file first, but **stream the extracted chunks directly back to S3**.
-
-```go
-package main
-
-import (
-	"context"
-	"fmt"
-	"io"
-	"log"
-	"os"
-
-	"github.com/bastianrob/skyhold-pdf-splitter/processor"
-	"gocloud.dev/blob"
-	_ "gocloud.dev/blob/s3blob"
-)
-
-func main() {
-	ctx := context.Background()
-
-	// 1. Connect to S3 compatible storage
-	bucket, err := blob.OpenBucket(ctx, "s3://my-bucket?region=us-east-1")
-	if err != nil {
-		log.Fatalf("Failed to open bucket: %v", err)
-	}
-	defer bucket.Close()
-
-	// 2. Download source PDF to a local temp file for io.ReadSeeker support
-	s3Reader, _ := bucket.NewReader(ctx, "massive_report.pdf", nil)
-	tempFile, _ := os.CreateTemp("", "source-*.pdf")
-	io.Copy(tempFile, s3Reader)
-	s3Reader.Close()
-	
-	// Reset pointer to the beginning of the file to prepare for parsing
-	tempFile.Seek(0, io.SeekStart)
-	defer os.Remove(tempFile.Name()) // Clean up locally
-	defer tempFile.Close()
-
-	// 3. Chunk PDF and stream outputs back to S3 directly
-	config := processor.ChunkConfig{
-		Input:    tempFile,
-		PageSize: 100,
-		CreateWriter: func(chunkIndex int, maxDigits int) (io.WriteCloser, error) {
-			// Stream the output chunk directly to S3
-			outKey := fmt.Sprintf("output/chunk-%0*d.pdf", maxDigits, chunkIndex)
-			return bucket.NewWriter(ctx, outKey, nil)
-		},
-		OnLog: func(msg string) {
-			log.Println(msg)
-		},
-	}
-
-	if err := processor.Chunk(config); err != nil {
-		log.Fatalf("Chunking failed: %v", err)
-	}
+    processor.CombinePDFs(config)
 }
 ```
 
 ## License
-
-Skyhold PDF Splitter is licensed under the [Apache License, Version 2.0](LICENSE). 
+Skyhold PDF is licensed under the [Apache License, Version 2.0](LICENSE).  
 Copyright © 2026 Robin Bastian / SkyHold.
