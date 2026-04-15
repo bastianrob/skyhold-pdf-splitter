@@ -94,8 +94,8 @@ var extractCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(extractCmd)
 
-	extractCmd.Flags().IntVarP(&from, "from", "f", 0, "First page to extract (1-indexed)")
-	extractCmd.Flags().IntVarP(&to, "to", "t", 0, "Last page to extract (inclusive)")
+	extractCmd.Flags().IntVarP(&from, "from", "F", 0, "First page to extract (1-indexed)")
+	extractCmd.Flags().IntVarP(&to, "to", "T", 0, "Last page to extract (inclusive)")
 
 	extractCmd.MarkFlagRequired("from")
 	extractCmd.MarkFlagRequired("to")

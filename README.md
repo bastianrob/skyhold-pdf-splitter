@@ -53,7 +53,7 @@ pdf compress -i scan.pdf -o small.pdf -q 40 -m 50 -v
 ### 4. Extraction
 Extract a targeted page range.
 ```bash
-pdf extract -i source.pdf -f 10 -t 20 -o snippet.pdf
+pdf extract -i source.pdf -F 10 -T 20 -o snippet.pdf
 ```
 
 ## Global Flags
@@ -65,6 +65,8 @@ pdf extract -i source.pdf -f 10 -t 20 -o snippet.pdf
 - `-m, --scale`: Image scaling factor (1-100, default: 100)
 - `-j, --concurrency`: Parallel workers for optimization (Default: NumCPU)
 - `-p, --password`: PDF password
+- `-F, --from`: First page to extract (Extract command)
+- `-T, --to`: Last page to extract (Extract command)
 - `-f, --force`: Overwrite existing files
 - `-v, --verbose`: Enable progress bars and detailed logs
 
