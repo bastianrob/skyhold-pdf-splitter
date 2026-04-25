@@ -34,6 +34,9 @@ func CombinePDFs(c CombineConfig) error {
 	conf.UserPW = c.Password
 	conf.OwnerPW = c.Password
 	conf.Optimize = c.Compress
+	conf.ValidationMode = model.ValidationRelaxed
+	conf.Reader15 = true
+	conf.PostProcessValidate = false
 
 	if c.OnLog != nil {
 		c.OnLog(fmt.Sprintf("Merging %d files...", len(c.Inputs)))

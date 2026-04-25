@@ -56,6 +56,12 @@ Extract a targeted page range.
 pdf extract -i source.pdf -F 10 -T 20 -o snippet.pdf
 ```
 
+### 5. Page Removal
+Remove specific pages from a PDF.
+```bash
+pdf remove -i source.pdf -P 23,25,49 -o cleaned.pdf
+```
+
 ## Global Flags
 - `-i, --input`: Source PDF file (Required for root, compress, extract)
 - `-o, --out`: Destination file or directory (Required)
